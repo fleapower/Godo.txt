@@ -1,11 +1,11 @@
-// Public Release Alpha 0.05
+// Public Release ß1.0
 
 function doGet() {
   try {
     return HtmlService.createTemplateFromFile('index')
       .evaluate()
       .setFaviconUrl('https://drive.google.com/uc?export=download&id=1f_VcmveEWFC6-UK6BJVYdVATOkaFzg__&format=png')
-      .setTitle('Kano.txt');
+      .setTitle('Godo.txt');
   } catch (e) {
     return HtmlService.createHtmlOutput(`
       <h2>Error</h2>
