@@ -202,14 +202,21 @@
         grid-template-columns: repeat(7, 1fr);
       }
 
-      .day {
-        padding: 4px;
-        text-align: center;
-        cursor: pointer;
+      .day-number {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
       }
-
-      .day:hover {
-        background-color: #e0e0e0;
+      
+      .day-number.selected {
+        background-color: #e0e0e0; /* Light gray background for selected date */
+      }
+      
+      .day-number.today {
+        font-weight: bold;
       }
 
       .empty {
@@ -257,13 +264,38 @@
         font-size: 0.9em;
         color: #666;
       }
+
+      .sync-indicator {
+        position: fixed;
+        top: 2px;
+        left: 2px;
+        width: 20px;
+        height: 20px;
+        padding: 2px;
+        display: none;
+        z-index: 1000;
+      }
+      .sync-indicator.syncing {
+        display: block;
+      }
+      .sync-indicator::after {
+        content: "↻";
+        display: inline-block;
+        margin-left: 5px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
     <base target="_top">
   </head>
   <body tabindex="0">
+    <div class="sync-indicator" id="syncIndicator" title="Syncing..."></div>
     <div style="display: flex; justify-content: space-between;">
       <div>
-        <h1><font face="Courier New">Kano.txt</font>
+        <h2><font face="Courier New">Godo.txt</font>
         <button class="button" onclick="loadNewFile()">Load ToDo.txt file</button>
         <button class="button" onclick="loadTasks()">Reload Tasks</button>
       </div>
@@ -1063,7 +1095,14 @@
           this.onChange = options.onChange || (() => {});
           this.selectedDate = null;
           this.currentDate = new Date();
-          this.today = new Date().toISOString().split('T')[0]; // Store today's date in YYYY-MM-DD format
+          
+          // Get today's date in local timezone
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          this.today = `${year}-${month}-${day}`; // Store today's date in YYYY-MM-DD format in local time
+          
           this.render();
         }
 
@@ -1113,28 +1152,37 @@
           for (let day = 1; day <= lastDay.getDate(); day++) {
             const dayDiv = document.createElement('div');
             dayDiv.className = 'calendar-day';
-            dayDiv.textContent = day;
+            
+            // Create a span for the day number
+            const dayNumber = document.createElement('span');
+            dayNumber.className = 'day-number';
+            dayNumber.textContent = day;
             
             const date = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth(), day);
-            const dateString = date.toISOString().split('T')[0];
+            // Format date as YYYY-MM-DD in local time
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(date.getDate()).padStart(2, '0');
+            const dateString = `${year}-${month}-${dayStr}`;
             dayDiv.dataset.date = dateString;
             
             // Add today highlight
             if (dateString === this.today) {
-              dayDiv.classList.add('today');
-              dayDiv.style.backgroundColor = '#90EE90'; // Light green background
-              dayDiv.style.fontWeight = 'bold';
+              dayNumber.classList.add('today');
+              dayNumber.style.fontWeight = 'bold';
             }
             
             if (this.selectedDate === dateString) {
-              dayDiv.classList.add('selected');
+              dayNumber.classList.add('selected');
             }
+            
+            dayDiv.appendChild(dayNumber);
             
             dayDiv.addEventListener('click', () => {
               const oldSelected = grid.querySelector('.selected');
               if (oldSelected) oldSelected.classList.remove('selected');
               
-              dayDiv.classList.add('selected');
+              dayNumber.classList.add('selected');
               this.selectedDate = dayDiv.dataset.date;
               this.onChange(this.selectedDate);
             });
@@ -1406,6 +1454,9 @@
       // Function to save all tasks to a text file
       async function saveTasks() {
         try {
+          const syncIndicator = document.getElementById('syncIndicator');
+          syncIndicator.classList.add('syncing');
+          
           const canSave = await checkFileModified();
           if (canSave) {
             const allTasksText = allTasks.map(task => task.Task).join('\n');
@@ -1413,6 +1464,11 @@
               .withSuccessHandler(function(newModifiedTime) {
                 lastModifiedTime = newModifiedTime;
                 lastSavedTime = newModifiedTime;
+                syncIndicator.classList.remove('syncing');
+              })
+              .withFailureHandler(function(error) {
+                syncIndicator.classList.remove('syncing');
+                console.error('Error saving tasks:', error);
               })
               .saveTasksToFile(allTasksText);
           } else {
