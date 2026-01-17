@@ -19,3 +19,5 @@ This is a GAS web app implementation of todo.txt. To deploy the script:
 The GAS should be running as a web app. The first thing you should do is click the _Load ToDo.txt file_.
 
 For help, visit https://www.reddit.com/r/todotxt/.
+
+![godo sample](https://github.com/user-attachments/assets/8ce98e7c-a1b0-420b-b82c-d57676da9e40)
