@@ -25,7 +25,8 @@ The GAS should be running as a web app. The first thing you should do is click t
 <ins>2.0</ins>  
 NEW: Implemented drag and drop  
 CHANGE: Changed some hotkeys for better user experience  
-BUG Fix: Hang when selecting bulk action after using CTRL-A  
+BUG FIX: Hang when selecting bulk action after using CTRL-A  
+BUG FIX: Fixed autosave not triggering after drag and drop  
 
 <ins>1.0</ins>  
 Initial release.
