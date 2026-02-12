@@ -1,5 +1,5 @@
 # Godo.txt #
-**Google Apps Script for todo.txt.**
+### Google Apps Script for todo.txt. ###
 
 **Disclaimer: Back up your todo.txt file or just create a new one before testing! If you fail to back up your file, you can always recover it using the file versioning on Google Drive. Use at your own risk!**
 
@@ -18,6 +18,14 @@ This is a GAS web app implementation of todo.txt. To deploy the script:
 
 The GAS should be running as a web app. The first thing you should do is click the _Load ToDo.txt file_.
 
-For help, visit https://www.reddit.com/r/todotxt/.
-
 ![godo sample](https://github.com/user-attachments/assets/8ce98e7c-a1b0-420b-b82c-d57676da9e40)
+
+<ins>**Change Log**</ins>
+
+<ins>2.0</ins>  
+NEW: Implemented drag and drop  
+CHANGE: Changed some hotkeys for better user experience  
+BUG Fix: Hang when selecting bulk action after using CTRL-A  
+
+<ins>1.0</ins>  
+Initial release.
