@@ -86,7 +86,19 @@
         -ms-user-select: none;      /* IE 10 and IE 11 */
         user-select: none;          /* Standard syntax */
       }
+      
+      .task[data-sort-state="file"] {
+        cursor: grab;
+      }
 
+      .task.dragging {
+        opacity: 0.5;
+        cursor: grabbing;
+      }
+
+      .task.drag-over {
+        border-top: 3px solid #4CAF50;
+      }
 
       .sidebar-dialog {
         position: fixed;
@@ -894,7 +906,19 @@
           div.dataset.taskId = task.TaskID;
           div.dataset.originalIndex = originalIndex;
           div.dataset.filteredIndex = filteredIndex;
+          div.draggable = true;
           div.onclick = (event) => handleTaskClick(event, filteredIndex);
+          
+          // Set sort state for cursor styling
+          div.dataset.sortState = currentSortState;
+          
+          // Add drag event handlers
+          div.addEventListener('dragstart', (e) => handleDragStart(e, filteredIndex));
+          div.addEventListener('dragend', handleDragEnd);
+          div.addEventListener('dragover', handleDragOver);
+          div.addEventListener('drop', (e) => handleDrop(e, filteredIndex));
+          div.addEventListener('dragenter', handleDragEnter);
+          div.addEventListener('dragleave', handleDragLeave);
 
           // Task display formatting
           let taskText = task.Task
@@ -925,6 +949,49 @@
           div.innerHTML = taskText;
           taskList.appendChild(div);
         });
+
+        // Add a dummy task at the end to enable dropping to the bottom
+        if (currentSortState === 'file' && filteredTasks.length > 0) {
+          const dummyTask = document.createElement('div');
+          dummyTask.className = 'task dummy-task';
+          dummyTask.style.height = '1px';
+          dummyTask.style.borderBottom = 'none';
+          dummyTask.style.padding = '0';
+          dummyTask.style.marginTop = '5px';
+          dummyTask.style.display = 'none';
+          
+          // Add drag event handlers to dummy task
+          dummyTask.addEventListener('dragover', handleDragOver);
+          dummyTask.addEventListener('dragenter', (e) => {
+            if (draggedIndex !== null) {
+              dummyTask.classList.add('drag-over');
+            }
+          });
+          dummyTask.addEventListener('dragleave', (e) => {
+            dummyTask.classList.remove('drag-over');
+          });
+          dummyTask.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (draggedIndex !== null && currentSortState === 'file') {
+              // Special handling for moving to the end
+              const fromOriginalIndex = filteredTasks[draggedIndex].originalIndex;
+              const [movedTask] = allTasks.splice(fromOriginalIndex, 1);
+              allTasks.push(movedTask);
+              
+              // Update TaskIDs for all tasks
+              allTasks.forEach((task, index) => {
+                task.TaskID = index;
+              });
+              
+              // Reapply filters to refresh the display
+              applyFilters();
+            }
+            dummyTask.classList.remove('drag-over');
+          });
+          
+          taskList.appendChild(dummyTask);
+        }
 
         updateTaskCount();
 
@@ -1074,6 +1141,160 @@
             }
           }
         }, 500);
+      }
+
+      // Drag and drop functionality
+      let draggedIndex = null;
+      let autoScrollInterval = null;
+      let currentMouseY = 0;
+
+      function startAutoScroll() {
+        if (autoScrollInterval) return;
+        
+        autoScrollInterval = setInterval(() => {
+          const scrollThreshold = 300; // pixels from edge
+          const scrollSpeed = 8; // pixels per interval
+          
+          if (draggedIndex === null) {
+            stopAutoScroll();
+            return;
+          }
+          
+          const viewportHeight = window.innerHeight;
+          
+          // Scroll up if mouse is near top edge of viewport
+          if (currentMouseY < scrollThreshold) {
+            window.scrollBy({
+              top: -scrollSpeed,
+              behavior: 'instant'
+            });
+          }
+          // Scroll down if mouse is near bottom edge of viewport
+          else if (currentMouseY > viewportHeight - scrollThreshold) {
+            window.scrollBy({
+              top: scrollSpeed,
+              behavior: 'instant'
+            });
+          }
+        }, 16); // ~60fps
+      }
+      
+      function stopAutoScroll() {
+        if (autoScrollInterval) {
+          clearInterval(autoScrollInterval);
+          autoScrollInterval = null;
+        }
+      }
+
+      function handleDragStart(e, index) {
+        if (currentSortState !== 'file') {
+          e.preventDefault();
+          return;
+        }
+        
+        draggedIndex = index;
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', e.target.innerHTML);
+        
+        // Initialize mouse position from the drag start event
+        currentMouseY = e.clientY || 0;
+        
+        // Show the dummy task
+        const dummyTask = document.querySelector('.dummy-task');
+        if (dummyTask) {
+          dummyTask.style.display = 'block';
+        }
+        
+        // Add global mouse move listener to track position
+        document.addEventListener('mousemove', updateMousePosition);
+        document.addEventListener('dragover', updateMousePositionFromDrag);
+        
+        // Start auto-scroll
+        startAutoScroll();
+      }
+
+      function updateMousePosition(e) {
+        currentMouseY = e.clientY;
+      }
+      
+      function updateMousePositionFromDrag(e) {
+        currentMouseY = e.clientY;
+      }
+
+      function handleDragEnd(e) {
+        e.target.classList.remove('dragging');
+        
+        // Remove all drag-over classes
+        const tasks = document.querySelectorAll('.task');
+        tasks.forEach(task => task.classList.remove('drag-over'));
+        
+        // Hide the dummy task
+        const dummyTask = document.querySelector('.dummy-task');
+        if (dummyTask) {
+          dummyTask.style.display = 'none';
+        }
+        
+        // Remove global mouse move listeners
+        document.removeEventListener('mousemove', updateMousePosition);
+        document.removeEventListener('dragover', updateMousePositionFromDrag);
+        
+        // Stop auto-scroll
+        stopAutoScroll();
+      }
+
+      function handleDragOver(e) {
+        if (e.preventDefault) {
+          e.preventDefault();
+        }
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+      }
+
+      function handleDragEnter(e) {
+        if (draggedIndex !== null && e.target.classList.contains('task')) {
+          e.target.classList.add('drag-over');
+        }
+      }
+
+      function handleDragLeave(e) {
+        if (e.target.classList.contains('task')) {
+          e.target.classList.remove('drag-over');
+        }
+      }
+
+      function handleDrop(e, dropIndex) {
+        if (e.stopPropagation) {
+          e.stopPropagation();
+        }
+        e.preventDefault();
+        
+        if (draggedIndex !== null && draggedIndex !== dropIndex && currentSortState === 'file') {
+          reorderTasks(draggedIndex, dropIndex);
+        }
+        
+        return false;
+      }
+
+      function reorderTasks(fromIndex, toIndex) {
+        // Get the original indices from the filtered tasks
+        const fromOriginalIndex = filteredTasks[fromIndex].originalIndex;
+        const toOriginalIndex = filteredTasks[toIndex].originalIndex;
+        
+        // Remove the dragged task from allTasks
+        const [movedTask] = allTasks.splice(fromOriginalIndex, 1);
+        
+        // Insert it at the new position (adjust for the removal)
+        const adjustedToIndex = fromOriginalIndex < toOriginalIndex ? toOriginalIndex - 1 : toOriginalIndex;
+        allTasks.splice(adjustedToIndex, 0, movedTask);
+        
+        // Update TaskIDs for all tasks
+        allTasks.forEach((task, index) => {
+          task.TaskID = index;
+        });
+        
+        // Reapply filters to refresh the display
+        applyFilters();
       }
 
       // Function to get today's date in user's local time zone in YYYY-MM-DD format
@@ -1922,12 +2143,15 @@
           }
         } else if (event.ctrlKey && event.key.toLowerCase() ==='a') {
           event.preventDefault();
-          const tasks = document.getElementsByClassName('task');
+          const taskList = document.getElementById('taskList');
+          const tasks = taskList.getElementsByClassName('task');
+          selectedTasks.clear();
           Array.from(tasks).forEach((task, index) => {
+            if (task.classList.contains('dummy-task')) return;
             task.classList.add('selected');
             selectedTasks.add(index);
           });
-          lastSelectedIndex = tasks.length - 1;
+          lastSelectedIndex = filteredTasks.length - 1;
         } else if (event.key.toLowerCase() ==='c' && event.ctrlKey) {
           copySelectedTasks();
         } else if (event.key.toLowerCase() ==='c' && !event.ctrlKey) {
@@ -1957,7 +2181,7 @@
           showHelpWindow();
         } else if (event.key === '(') {
           addNewTask();
-        } else if (event.key.toLowerCase() === 'q') {
+        } else if (event.key.toLowerCase() === 'r' && !event.ctrlKey) {
           event.preventDefault();
           cyclePriorityState();
         } else if (event.key.toLowerCase() ==='s') {
